@@ -4,7 +4,7 @@ Attributes:
     log (logging.Logger): Logger for this module.
 """
 import logging
-from os import path
+from os import path, sep as pathsep
 from time import time
 from threading import RLock
 from threading import Timer
@@ -183,6 +183,28 @@ class ViewConfig(object):
             flags_as_str_list += flag.as_list()
         return (completer, flags_as_str_list)
 
+    @classmethod
+    def _find_cmake_build_dir(cls, projdir):
+        maxrecurse = 100
+        project = ''
+        while projdir and projdir != pathsep:
+            maxrecurse -= 1
+            if not maxrecurse:
+                log.error('Infinite search')
+                return None
+            log.debug('search cmake build dir in %s', projdir)
+            if not path.isfile(path.join(projdir, 'CMakeLists.txt')):
+                log.debug('found cmake top dir in %s', projdir)
+                if path.isdir(path.join(projdir, 'build')):
+                    project = path.basename(lastdir)
+                    cmakebuilddir = path.join(projdir, 'build', project)
+                    log.info('found CMake build dir: %s', cmakebuilddir)
+                    return cmakebuilddir
+            lastdir = projdir
+            projdir = path.dirname(projdir)
+        log.error('CMake build dir not found')
+        return None
+
     @staticmethod
     def __load_source_flags(view, settings, include_prefixes):
         """Generate flags from source.
@@ -209,6 +231,10 @@ class ViewConfig(object):
                 # the user knows where to search for the flags source
                 search_folder = source_dict["search_in"]
                 if search_folder:
+                    log.error("SEARCH FOLDER %s", search_folder)
+                    if search_folder == '<cmakebuild>':
+                        search_folder = ViewConfig._find_cmake_build_dir(
+                            current_dir)
                     search_scope = SearchScope(
                         from_folder=path.normpath(search_folder))
             if file_name == "CMakeLists.txt":
