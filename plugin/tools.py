@@ -555,13 +555,13 @@ class Tools:
             bool: True if we want to handle this view, False otherwise
         """
         if not view:
-            log.error(" view is None")
+            log.debug(" view is None")
             return False
         if not view.file_name():
-            log.error(" view file_name is None")
+            log.debug(" view file_name is None")
             return False
         if not Tools.has_valid_syntax(view):
-            log.error(" view has wrong syntax: %s",
+            log.debug(" view has wrong syntax: %s",
                       Tools.get_view_syntax(view))
             return False
         if view.is_scratch():

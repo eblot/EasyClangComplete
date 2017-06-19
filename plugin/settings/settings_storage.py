@@ -105,6 +105,8 @@ class SettingsStorage:
             view (sublime.View): current view
         """
         try:
+            if not view:
+                return
             # init current and parrent folders:
             if not Tools.is_valid_view(view):
                 log.error(" no view to populate common flags from")

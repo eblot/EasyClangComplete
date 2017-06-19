@@ -170,6 +170,8 @@ class EasyClangComplete(sublime_plugin.EventListener):
 
         """
         # disable on_activated_async when running tests
+        if not view:
+            return
         if view.settings().get("disable_easy_clang_complete"):
             return
         if not Tools.is_valid_view(view):
@@ -194,6 +196,8 @@ class EasyClangComplete(sublime_plugin.EventListener):
         Args:
             view (sublime.View): current view
         """
+        if not view:
+            return
         settings = self.settings_manager.settings_for_view(view)
         if settings.errors_style == SettingsStorage.PHANTOMS_STYLE:
             return
@@ -212,6 +216,8 @@ class EasyClangComplete(sublime_plugin.EventListener):
         Args:
             view (sublime.View): current view
         """
+        if not view:
+            return
         if Tools.is_valid_view(view):
             log.debug(" on_modified_async view id %s", view.buffer_id())
             view_config = self.view_config_manager.get_from_cache(view)
@@ -229,6 +235,8 @@ class EasyClangComplete(sublime_plugin.EventListener):
 
         """
         # disable on_activated_async when running tests
+        if not view:
+            return
         if view.settings().get("disable_easy_clang_complete"):
             return
         if Tools.is_valid_view(view):
@@ -249,6 +257,8 @@ class EasyClangComplete(sublime_plugin.EventListener):
             view (sublime.View): current view
 
         """
+        if not view:
+            return
         if Tools.is_valid_view(view):
             log.debug(" closing view %s", view.buffer_id())
             self.settings_manager.clear_for_view(view)
@@ -350,6 +360,8 @@ class EasyClangComplete(sublime_plugin.EventListener):
         cursor.
 
         """
+        if not view:
+            return
         if not Tools.is_valid_view(view):
             return
 
@@ -381,6 +393,8 @@ class EasyClangComplete(sublime_plugin.EventListener):
         Returns:
             sublime.Completions: completions with a flag
         """
+        if not view:
+            return
         if not Tools.is_valid_view(view):
             log.debug(" not a valid view")
             return Tools.SHOW_DEFAULT_COMPLETIONS
