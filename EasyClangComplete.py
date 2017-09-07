@@ -312,7 +312,10 @@ class EasyClangComplete(sublime_plugin.EventListener):
         """
         if not future.done():
             return
-        (tooltip_request, result) = future.result()
+        results = future.result()
+        if results is None:
+            return
+        (tooltip_request, result) = results
         if result == "":
             return
         if not tooltip_request:
