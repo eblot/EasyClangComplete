@@ -130,7 +130,7 @@ class Completer(BaseCompleter):
 
         Please use libclang or set "show_type_info" to false.
         """
-        sublime.error_message(msg)
+        #  sublime.error_message(msg)
 
     def update(self, view, settings):
         """Update build for current view.
