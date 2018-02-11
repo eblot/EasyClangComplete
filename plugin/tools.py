@@ -1,4 +1,4 @@
-"""This module contains various tools.
+"""Collection of various tools.
 
 Attributes:
     log (logging): logger for this module
@@ -11,6 +11,7 @@ Attributes:
     PROGRESS_MSG (str): unicode string of chars to show progress with
 """
 from os import path
+from os import environ
 from os import makedirs
 from os import listdir
 
@@ -20,8 +21,7 @@ import tempfile
 import subprocess
 
 import re
-import sys
-import imp
+
 
 PKG_NAME = path.basename(path.dirname(path.dirname(__file__)))
 
@@ -36,52 +36,11 @@ OSX_CLANG_VERSION_DICT = {
     '8.0': '3.8',
     '8.1': '3.9',
     '8.2': '3.9',
-    '9.0': '4.0'
+    '9.0': '4.0',
+    '9.1': '4.0'
 }
 
 log = logging.getLogger("ECC")
-
-
-def singleton(class_):
-    """Singleton class wrapper.
-
-    Args:
-      class_ (Class): Class to wrap.
-
-    Returns:
-      class_: unique instance of object.
-    """
-    instances = {}
-
-    def getinstance(*args, **kwargs):
-        """Get instance of a class."""
-        if class_ not in instances:
-            instances[class_] = class_(*args, **kwargs)
-        return instances[class_]
-    return getinstance
-
-
-class Reloader:
-    """Reloader for all dependencies."""
-
-    @staticmethod
-    def reload_all():
-        """Reload all loaded modules."""
-        prefix = PKG_NAME + '.plugin.'
-        # reload all twice to make sure all dependencies are satisfied
-        log.debug("reload all modules first time")
-        Reloader.reload_once(prefix)
-        log.debug("reload all modules second time")
-        Reloader.reload_once(prefix)
-        log.debug("all modules reloaded")
-
-    @staticmethod
-    def reload_once(prefix):
-        """Reload all modules once."""
-        for name, module in sys.modules.items():
-            if name.startswith(prefix):
-                log.debug("reloading module: '%s'", name)
-                imp.reload(module)
 
 
 class SublBridge:
@@ -181,7 +140,7 @@ class SublBridge:
 
     @staticmethod
     def show_auto_complete(view):
-        """Calling this function reopens completion popup.
+        """Reopen completion popup.
 
         It therefore subsequently calls
         EasyClangComplete.on_query_completions(...)
@@ -195,6 +154,11 @@ class SublBridge:
             'disable_auto_insert': True,
             'api_completions_only': False,
             'next_competion_if_showing': False})
+
+    @staticmethod
+    def show_error_dialog(message):
+        """Show an error message dialog."""
+        sublime.error_message(message)
 
 
 class PosStatus:
@@ -228,8 +192,11 @@ class File:
             # leave the object unitialized
             return
         self.__full_path = path.abspath(file_path)
-        # initialize the file
-        open(self.__full_path, 'a+').close()
+        # initialize the file if it does not exist already
+        if path.isfile(self.__full_path):
+            open(self.__full_path, 'r').close()
+        else:
+            open(self.__full_path, 'a+').close()
 
     def full_path(self):
         """Get full path to file.
@@ -468,7 +435,7 @@ class Tools:
                         ".m", ".mm"]
 
     C_SYNTAX = ["C", "C Improved", "C99"]
-    CPP_SYNTAX = ["C++", "C++11", "C++ (Colorcoded)"]
+    CPP_SYNTAX = ["C++", "C++11", "C++ (Colorcoded)", "cuda-c++"]
     OBJECTIVE_C_SYNTAX = ["Objective-C"]
     OBJECTIVE_CPP_SYNTAX = ["Objective-C++"]
     valid_syntax = C_SYNTAX + CPP_SYNTAX \
@@ -493,6 +460,17 @@ class Tools:
                 log.debug("Found folder: %s", child)
                 expanded.append(child)
         return expanded
+
+    @staticmethod
+    def to_md(error_list):
+        """Convert an error dict to markdown string."""
+        if len(error_list) > 1:
+            # Make it a markdown list.
+            text_to_show = '\n- '.join(error_list)
+            text_to_show = '- ' + text_to_show
+        else:
+            text_to_show = error_list[0]
+        return text_to_show
 
     @staticmethod
     def get_temp_dir():
@@ -668,37 +646,46 @@ class Tools:
         return PosStatus.COMPLETION_NOT_NEEDED
 
     @staticmethod
-    def run_command(command, shell=True):
+    def run_command(command, shell=True, cwd=path.curdir, env=environ,
+                    stdin=None, default=None):
         """Run a generic command in a subprocess.
 
         Args:
             command (str): command to run
+            stdin: The standard input channel for the started process.
+            default (andy): The default return value in case run fails.
 
         Returns:
-            str: raw command output
+            str: raw command output or default value
         """
+        output_text = default
         try:
-            stdin = None
             startupinfo = None
             if isinstance(command, list):
                 command = subprocess.list2cmdline(command)
-                log.debug("command: \n%s", command)
+                log.debug("running command: \n%s", command)
             if sublime.platform() == "windows":
                 # Don't let console window pop-up briefly.
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 startupinfo.wShowWindow = subprocess.SW_HIDE
-                stdin = subprocess.PIPE
+                if stdin is None:
+                    stdin = subprocess.PIPE
             output = subprocess.check_output(command,
                                              stdin=stdin,
                                              stderr=subprocess.STDOUT,
                                              shell=shell,
+                                             cwd=cwd,
+                                             env=env,
                                              startupinfo=startupinfo)
             output_text = ''.join(map(chr, output))
         except subprocess.CalledProcessError as e:
             output_text = e.output.decode("utf-8")
-            log.debug("clang process finished with code: %s", e.returncode)
-            log.debug("clang process output: \n%s", output_text)
+            log.debug("command finished with code: %s", e.returncode)
+            log.debug("command output: \n%s", output_text)
+        except OSError:
+            log.debug(
+                "executable file not found executing: {}".format(command))
         return output_text
 
     @classmethod

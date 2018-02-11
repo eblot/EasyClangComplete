@@ -12,7 +12,7 @@ C, C++, Objective-C, and Objective-C++.
 [![Codacy Badge][img-codacy]][codacy]
 [![Coverage Badge][img-coverage]][coverage]
 [![Donate][img-paypal]][donate-paypal]
-[![Gratipay][img-gratipay]][gratipay]
+[![Bountysource][img-bountysource]][bountysource-link]
 
 # Jump right in! #
 You are just three simple steps away!
@@ -23,7 +23,7 @@ You are just three simple steps away!
     `EasyClangComplete`
 - If you don't have Package Control (you should)
   + download one of the releases from
-    [here](https://github.com/niosus/EasyClangComplete/releases).
+    [here](https://github.com/niosus/EasyClangComplete/releases) and restart Sublime Text after unpacking.
 
 ## 2. Install clang ##
 - **Ubuntu**        : `sudo apt-get install clang`
@@ -133,15 +133,8 @@ The trick with multiple `clang.cindex` files is inspired by this repo:
 The progress indicator idea is from
 [ColorSublime](https://github.com/Colorsublime/Colorsublime-Plugin) plugin.
 
-If you are an experienced python developer and find that something in my code
-sucks completely - **DO** tell me. Python is not my main language and I am
-always willing to learn.
-
-Some functionality is there only because of the help of the following users (in
-no particualr order):
-
-@Ventero, @riazanovskiy, @rchl, @Mischa-Alff, @jdumas, @simia, @tastytea,
-@brupelo, @randy3k, @david9991, @kjteske, @darwinyip, @rwols, @papadokolos.
+Some functionality is there only because of the awesome contributors to this
+project. To see their names plese check out the contributors page.
 
 ## Tests ##
 Most crucial functionality is covered with unit tests using
@@ -150,6 +143,9 @@ Most crucial functionality is covered with unit tests using
 ## Contributing ##
 Contributions are welcome! Look at the issue list. If there is something you
 think you can tackle, write about it in that issue and submit a Pull Request.
+
+Pull requests and some issues are partially managed by
+[maintainerd][maintainerd].
 
 Please don't jump into creating a Pull Request straight away and open an issue
 first. This way, we can synchronize our views on the problem, so that everyone
@@ -164,9 +160,9 @@ There are two branches:
 Code style:
 - Line width is `80` characters
 - Every public function should be documented.
-- The code passes linters:
+- The code *must* pass linters:
   + `pep8`
-  + `pep257`: ignoring `["D209", "D203", "D204"]`
+  + `pep257`: ignoring `["D209", "D203", "D204", "D213", "D406", "D407"]`
 
 Please ensure, that your code conforms to this.
 
@@ -175,7 +171,6 @@ Please ensure, that your code conforms to this.
 [![Flattr this git repo][img-flattr]][donate-flattr]
 [![Bountysource][img-bountysource]][bountysource-link]
 [![Beerpay][img-beerpay]][beerpay]
-[![Gratipay][img-gratipay]][gratipay]
 
 Current sponsor of this project is my sleep.
 Please buy me a cup of tea if you appreciate the effort.
@@ -183,9 +178,9 @@ Please buy me a cup of tea if you appreciate the effort.
 Also, pull requests are welcome! And don't forget to tell people about this
 plugin! The more people use it - the merrier.
 
-                      ╔═╗┌─┐┌─┐┬ ┬  ╔═╗┬  ┌─┐┌┐┌┌─┐  ╔═╗┌─┐┌┬┐┌─┐┬  ┌─┐┌┬┐┌─┐
-                      ║╣ ├─┤└─┐└┬┘  ║  │  ├─┤││││ ┬  ║  │ ││││├─┘│  ├┤  │ ├┤
-                      ╚═╝┴ ┴└─┘ ┴   ╚═╝┴─┘┴ ┴┘└┘└─┘  ╚═╝└─┘┴ ┴┴  ┴─┘└─┘ ┴ └─┘
+                         ╔═╗┌─┐┌─┐┬ ┬  ╔═╗┬  ┌─┐┌┐┌┌─┐  ╔═╗┌─┐┌┬┐┌─┐┬  ┌─┐┌┬┐┌─┐
+                         ║╣ ├─┤└─┐└┬┘  ║  │  ├─┤││││ ┬  ║  │ ││││├─┘│  ├┤  │ ├┤
+                         ╚═╝┴ ┴└─┘ ┴   ╚═╝┴─┘┴ ┴┘└┘└─┘  ╚═╝└─┘┴ ┴┴  ┴─┘└─┘ ┴ └─┘
 
 [release]: https://github.com/niosus/EasyClangComplete/releases
 [downloads]: https://packagecontrol.io/packages/EasyClangComplete
@@ -201,6 +196,7 @@ plugin! The more people use it - the merrier.
 [bountysource-link]: https://www.bountysource.com/teams/easyclangcomplete
 [beerpay]: https://beerpay.io/niosus/EasyClangComplete
 [gratipay]: https://gratipay.com/EasyClangComplete/
+[maintainerd]: https://github.com/divmain/maintainerd
 
 [img-gratipay]: https://img.shields.io/gratipay/user/niosus.svg?style=flat-square
 [img-beerpay]: https://beerpay.io/niosus/EasyClangComplete/badge.svg?style=flat-square

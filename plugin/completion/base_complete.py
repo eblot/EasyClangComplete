@@ -44,9 +44,11 @@ class BaseCompleter:
         self.clang_binary = settings.clang_binary
         # initialize error visualization
         self.error_vis = error_vis
+        # Store the latest errors here
+        self.latest_errors = None
 
     def complete(self, completion_request):
-        """Function to generate completions. See children for implementation.
+        """Generate completions. See children for implementation.
 
         Args:
             completion_request (ActionRequest): request object
@@ -56,7 +58,7 @@ class BaseCompleter:
         """
         raise NotImplementedError("calling abstract method")
 
-    def info(self, tooltip_request):
+    def info(self, tooltip_request, settings):
         """Provide information about object in given location.
 
         Using the current translation unit it queries libclang for available
@@ -65,6 +67,7 @@ class BaseCompleter:
         Args:
             tooltip_request (tools.ActionRequest): A request for action
                 from the plugin.
+            settings: All plugin settings.
 
         Raises:
             NotImplementedError: Guarantees we do not call this abstract method
@@ -86,16 +89,33 @@ class BaseCompleter:
         """
         raise NotImplementedError("calling abstract method")
 
-    def show_errors(self, view, output):
+    def get_declaration_location(self, view, row, col):
+        """Get location of declaration from given location in file.
+
+        Args:
+            view (sublime.View): current view
+
+        Returns:
+            Location: location of declaration
+        """
+        raise NotImplementedError("calling abstract method")
+
+    def save_errors(self, output):
+        """Generate and store the errors.
+
+        Args:
+            output (object): opaque output to be parsed by compiler variant
+        """
+        self.latest_errors = self.compiler_variant.errors_from_output(output)
+
+    def show_errors(self, view):
         """Show current complie errors.
 
         Args:
             view (sublime.View): Current view
-            output (object): opaque output to be parsed by compiler variant
         """
-        errors = self.compiler_variant.errors_from_output(output)
         if not Tools.is_valid_view(view):
             log.error("cannot show errors. View became invalid!")
             return
-        self.error_vis.generate(view, errors)
+        self.error_vis.generate(view, self.latest_errors)
         self.error_vis.show_errors(view)

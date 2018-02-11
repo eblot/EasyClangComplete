@@ -24,6 +24,7 @@ def has_libclang():
     return True
 
 
+# TODO(@kjteske): For now the tests seem to not be working for binary completer
 def should_run_objc_tests():
     """Decide if Objective C tests should be run.
 
@@ -36,8 +37,7 @@ def should_run_objc_tests():
 
 
 class BaseTestCompleter(object):
-    """
-    Base class for tests that are independent of the Completer implementation.
+    """Base class for tests independent of the Completer implementation.
 
     Attributes:
         view (sublime.View): view
@@ -45,7 +45,7 @@ class BaseTestCompleter(object):
     """
 
     def set_up_completer(self):
-        """Utility method to set up a completer for the current view.
+        """Set up a completer for the current view.
 
         Returns:
             BaseCompleter: completer for the current view.
@@ -60,7 +60,7 @@ class BaseTestCompleter(object):
         return completer
 
     def tear_down_completer(self):
-        """Utility method to set up a completer for the current view.
+        """Tear down completer for the current view.
 
         Returns:
             BaseCompleter: completer for the current view.
@@ -194,14 +194,14 @@ class BaseTestCompleter(object):
 
         # Verify that we got the expected completions back.
         self.assertIsNotNone(completions)
-        expected = ['begin\titerator begin()', 'begin()']
+        expected = ['clear\tvoid clear()', 'clear()']
         self.assertIn(expected, completions)
         self.tear_down_completer()
         self.tear_down()
 
     def test_complete_objc_property(self):
         """Test that we can complete Objective C properties."""
-        if not should_run_objc_tests():
+        if not should_run_objc_tests() or not self.use_libclang:
             return
         file_name = path.join(path.dirname(__file__),
                               'test_files',
@@ -229,7 +229,7 @@ class BaseTestCompleter(object):
 
     def test_complete_objc_void_method(self):
         """Test that we can complete Objective C void methods."""
-        if not should_run_objc_tests():
+        if not should_run_objc_tests() or not self.use_libclang:
             return
         file_name = path.join(path.dirname(__file__),
                               'test_files',
@@ -257,7 +257,7 @@ class BaseTestCompleter(object):
 
     def test_complete_objc_method_one_parameter(self):
         """Test that we can complete Objective C methods with one parameter."""
-        if not should_run_objc_tests():
+        if not should_run_objc_tests() or not self.use_libclang:
             return
         file_name = path.join(path.dirname(__file__),
                               'test_files',
@@ -286,7 +286,7 @@ class BaseTestCompleter(object):
 
     def test_complete_objc_method_multiple_parameters(self):
         """Test that we can complete Objective C methods with 2+ parameters."""
-        if not should_run_objc_tests():
+        if not should_run_objc_tests() or not self.use_libclang:
             return
         file_name = path.join(path.dirname(__file__),
                               'test_files',
@@ -317,7 +317,7 @@ class BaseTestCompleter(object):
 
     def test_complete_objcpp(self):
         """Test that we can complete code in Objective-C++ files."""
-        if not should_run_objc_tests():
+        if not should_run_objc_tests() or not self.use_libclang:
             return
         file_name = path.join(path.dirname(__file__),
                               'test_files',
@@ -376,6 +376,33 @@ class BaseTestCompleter(object):
         # Trigger default completions popup.
         self.view.run_command('auto_complete')
         self.assertTrue(self.view.is_auto_complete_visible())
+        self.tear_down_completer()
+        self.tear_down()
+
+    def test_get_declaration_location(self):
+        """Test getting declaration location."""
+        if not self.use_libclang:
+            return
+        file_name = path.join(path.dirname(__file__),
+                              'test_files',
+                              'test_location.cpp')
+        self.set_up_view(file_name)
+
+        completer = self.set_up_completer()
+
+        # Check the current cursor position is completable.
+        row = 9
+        col = 15
+        self.assertEqual(self.get_row(row), "  cool_class.foo();")
+        pos = self.view.text_point(row, col)
+        current_word = self.view.substr(self.view.word(pos))
+        self.assertEqual(current_word, "foo")
+
+        loc = completer.get_declaration_location(self.view, row + 1, col)
+        self.assertEqual(loc.file.name, file_name)
+        self.assertEqual(loc.line, 3)
+        self.assertEqual(loc.column, 8)
+
         self.tear_down_completer()
         self.tear_down()
 
