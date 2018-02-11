@@ -5,20 +5,15 @@ Attributes:
 """
 from .flags_source import FlagsSource
 from ..tools import File
-from ..tools import singleton
 from ..utils.unique_list import UniqueList
+from ..utils.singleton import ComplationDbCache
 
 from os import path
+from fnmatch import fnmatch
 
 import logging
 
 log = logging.getLogger("ECC")
-
-
-@singleton
-class ComplationDbCache(dict):
-    """Singleton for compilation database cache."""
-    pass
 
 
 class CompilationDb(FlagsSource):
@@ -30,14 +25,21 @@ class CompilationDb(FlagsSource):
     """
     _FILE_NAME = "compile_commands.json"
 
-    def __init__(self, include_prefixes):
+    def __init__(self, include_prefixes,
+                 header_to_source_map,
+                 use_target_compiler_builtins):
         """Initialize a compilation database.
 
         Args:
             include_prefixes (str[]): A List of valid include prefixes.
+            header_to_source_map (str[]): Templates to map header to sources.
+            use_target_compiler_builtins (bool): Retrieve target compiler built
+                                                 ins.
         """
         super().__init__(include_prefixes)
         self._cache = ComplationDbCache()
+        self._header_to_source_map = header_to_source_map
+        self._use_target_compiler_builtins = use_target_compiler_builtins
 
     def get_flags(self, file_path=None, search_scope=None):
         """Get flags for file.
@@ -56,10 +58,6 @@ class CompilationDb(FlagsSource):
         search_scope = self._update_search_scope(search_scope, file_path)
         # make sure the file name conforms to standard
         file_path = File.canonical_path(file_path)
-        # remove extension from a file
-        if file_path:
-            # strip the file path from extension.
-            file_path = path.splitext(file_path)[0]
         # initialize search scope if not initialized before
         # check if we have a hashed version
         log.debug("[db]:[get]: for file %s", file_path)
@@ -92,6 +90,14 @@ class CompilationDb(FlagsSource):
         if not db:
             log.debug("[db]: not found, return None.")
             return None
+        # If the file is not in the DB, try to find a related file:
+        if file_path and file_path not in db:
+            related_file_path = self._find_related_sources(file_path, db)
+            if related_file_path:
+                db[file_path] = db[related_file_path]
+                file_path = related_file_path
+        # If there are any flags in the DB (directly or via a related file),
+        # retrieve them:
         if file_path and file_path in db:
             self._cache[file_path] = current_db_path
             File.update_mod_time(current_db_path)
@@ -109,6 +115,8 @@ class CompilationDb(FlagsSource):
             unique entries for 'all' entry.
         """
         import json
+        from ..utils.compiler_builtins import CompilerBuiltIns
+
         data = None
 
         with open(database_file.full_path()) as data_file:
@@ -121,8 +129,12 @@ class CompilationDb(FlagsSource):
         for entry in data:
             file_path = File.canonical_path(entry['file'],
                                             database_file.folder())
-            file_path = path.splitext(file_path)[0]
             argument_list = []
+
+            base_path = database_file.folder()
+            if 'directory' in entry:
+                base_path = entry['directory']
+
             if 'command' in entry:
                 import shlex
                 argument_list = shlex.split(entry['command'])
@@ -132,8 +144,25 @@ class CompilationDb(FlagsSource):
                 # TODO(igor): maybe show message to the user instead here
                 log.critical(" compilation database has unsupported format")
                 return None
+
+            # If enabled, try to retrieve default flags for the compiler
+            # and language combination:
+            if self._use_target_compiler_builtins:
+                # Note: Calling the CompilerBuiltIns constructor shells out to
+                # calling the compiler; however, for every
+                # compiler/standard/language
+                # combination, the results are cached by the class internally.
+                builtins = CompilerBuiltIns(argument_list, file_path)
+
+                # Append built-in flags to the end of the list:
+                # Note: We keep the last argument as last, as it
+                # usually is the file name.
+                argument_list = (
+                    argument_list[:-1] + builtins.flags +
+                    argument_list[-1:])
+
             argument_list = CompilationDb.filter_bad_arguments(argument_list)
-            flags = FlagsSource.parse_flags(database_file.folder(),
+            flags = FlagsSource.parse_flags(base_path,
                                             argument_list,
                                             self._include_prefixes)
             # set these flags for current file
@@ -179,3 +208,58 @@ class CompilationDb(FlagsSource):
                 continue
             new_args.append(argument)
         return new_args
+
+    def _find_related_sources(self, file_path, db):
+        if not file_path:
+            log.debug("[db]:[header-to-source]: skip retrieving related "
+                      "files for invalid file_path input")
+            return
+        templates = self._get_templates()
+        log.debug("[db]:[header-to-source]: using lookup table:" +
+                  str(templates))
+
+        dirname = path.dirname(file_path)
+        basename = path.basename(file_path)
+        (stamp, ext) = path.splitext(basename)
+        # Search in all templates plus a set of default ones:
+        for template in templates:
+            log.debug("[db]:[header-to-source]: looking up via %s" % template)
+            # Construct a globbing pattern by taking the dirname of the input
+            # file and join it with the template part which may contain
+            # some pre-defined placeholders:
+            pattern = template.format(
+                basename=basename,
+                stamp=stamp,
+                ext=ext
+            )
+            pattern = path.join(dirname, pattern)
+            # Normalize the path, as templates might contain references
+            # to parent directories:
+            pattern = path.normpath(pattern)
+            for key in db:
+                if fnmatch(key, pattern):
+                    log.debug("[db]:[header-to-source]: found match %s" % key)
+                    return key
+
+    def _get_templates(self):
+        templates = self._header_to_source_map
+        # If we use the plain default (None), make it an empty array
+        if templates is None:
+            templates = list()
+        # Flatten directory entries (i.e. templates which end with a trailing
+        # path delimiter):
+
+        result = list()
+        for template in templates:
+            if template.endswith("/") or template.endswith("\\"):
+                result.append(template + "{stamp}.*")
+                result.append(template + "*.*")
+            else:
+                result.append(template)
+
+        # Include default templates:
+        default_templates = ["{stamp}.*", "*.*"]
+        for default_template in default_templates:
+            if default_template not in result:
+                result.append(default_template)
+        return result

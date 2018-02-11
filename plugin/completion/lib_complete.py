@@ -16,7 +16,7 @@ from ..tools import Tools
 from ..tools import SublBridge
 from ..tools import PKG_NAME
 from ..clang.utils import ClangUtils
-from ..settings.settings_storage import SettingsStorage
+from ..popups.popups import Popup
 
 from threading import RLock
 from os import path
@@ -33,8 +33,11 @@ cindex_dict = {
     '3.8': PKG_NAME + ".plugin.clang.cindex38",
     '3.9': PKG_NAME + ".plugin.clang.cindex39",
     '4.0': PKG_NAME + ".plugin.clang.cindex40",
-    '5.0': PKG_NAME + ".plugin.clang.cindex40"  # TODO: fixme
+    '5.0': PKG_NAME + ".plugin.clang.cindex50",
+    '6.0': PKG_NAME + ".plugin.clang.cindex50",  # FIXME
 }
+
+GLOBAL_TRIGGERS = ["::", "\t", " "]  # Triggers that should show types.
 
 
 class Completer(BaseCompleter):
@@ -159,13 +162,14 @@ class Completer(BaseCompleter):
                     unsaved_files=unsaved_files,
                     options=parse_options)
                 self.tu = trans_unit
+                self.save_errors(self.tu.diagnostics)  # Store for the future.
             except Exception as e:
                 log.error("error while compiling: %s", e)
             end = time.time()
             log.debug("compilation done in %s seconds", end - start)
 
     def complete(self, completion_request):
-        """Called asynchronously to create a list of autocompletions.
+        """Create a list of autocompletions. Called asynchronously.
 
         Using the current translation unit it queries libclang for the
         possible completions.
@@ -229,7 +233,7 @@ class Completer(BaseCompleter):
         else:
             point = completion_request.get_trigger_position()
             trigger = view.substr(point - 2) + view.substr(point - 1)
-            if trigger != "::":
+            if trigger not in GLOBAL_TRIGGERS:
                 excluded = self.bigger_ignore_list
             else:
                 excluded = self.default_ignore_list
@@ -237,7 +241,7 @@ class Completer(BaseCompleter):
         log.debug('completions: %s' % completions)
         return (completion_request, completions)
 
-    def info(self, tooltip_request):
+    def info(self, tooltip_request, settings):
         """Provide information about object in given location.
 
         Using the current translation unit it queries libclang for available
@@ -246,16 +250,17 @@ class Completer(BaseCompleter):
         Args:
             tooltip_request (tools.ActionRequest): A request for action
                 from the plugin.
+            settings: All plugin settings.
 
         Returns:
             (tools.ActionRequest, str): completion request along with the
                 info details read from the translation unit.
 
         """
-        empty_info = (tooltip_request, "")
+        empty_info = (tooltip_request, None)
         with Completer.rlock:
             if not self.tu:
-                return (tooltip_request, "")
+                return empty_info
             view = tooltip_request.get_view()
             (row, col) = SublBridge.cursor_pos(
                 view, tooltip_request.get_trigger_position())
@@ -265,13 +270,12 @@ class Completer(BaseCompleter):
             if not cursor:
                 return empty_info
             if cursor.kind == self.cindex.CursorKind.OBJC_MESSAGE_EXPR:
-                info_details = ClangUtils.build_objc_message_info_details(
-                    cursor)
-                return (tooltip_request, info_details)
+                info_popup = Popup.info_objc(cursor)
+                return tooltip_request, info_popup
             if cursor.referenced:
-                info_details = ClangUtils.build_info_details(
-                    cursor.referenced, self.cindex)
-                return (tooltip_request, info_details)
+                info_popup = Popup.info(
+                    cursor.referenced, self.cindex, settings)
+                return tooltip_request, info_popup
             return empty_info
 
     def update(self, view, settings):
@@ -319,15 +323,48 @@ class Completer(BaseCompleter):
             if not self.tu:
                 log.error("translation unit is not available. Not reparsing.")
                 return False
+
+            # Prepare unsaved files.
+            file_name = view.file_name()
+            file_body = view.substr(sublime.Region(0, view.size()))
+            unsaved_files = [(file_name, file_body)]
+
             start = time.time()
-            self.tu.reparse()
+            self.tu.reparse(unsaved_files=unsaved_files)
             end = time.time()
             log.debug("reparsed in %s seconds", end - start)
-            if settings.errors_style != SettingsStorage.NONE_STYLE:
-                self.show_errors(view, self.tu.diagnostics)
+            # Store and potentially show errors to the user.
+            self.save_errors(self.tu.diagnostics)  # Store for the future.
+            if settings.show_errors:
+                self.show_errors(view)
             return True
         log.error("no translation unit for view id %s", v_id)
         return False
+
+    def get_declaration_location(self, view, row, col):
+        """Get location of declaration from given location in file.
+
+        Args:
+            view (sublime.View): current view
+            row (int): cursor row
+            col (int): cursor col
+
+        Returns:
+            Location: location of declaration
+
+        """
+        with Completer.rlock:
+            if not self.tu:
+                return None
+            cursor = self.tu.cursor.from_location(
+                self.tu, self.tu.get_location(view.file_name(), (row, col)))
+            ref_new = None
+            if cursor and cursor.referenced:
+                ref = cursor.referenced
+                if cursor.kind.is_declaration():
+                    ref_new = ref.get_definition()
+                return (ref_new or ref).location
+            return None
 
     @staticmethod
     def _cindex_for_version(version):

@@ -2,7 +2,7 @@ env:
     global:
         # Your package name
         - PACKAGE="EasyClangComplete"
-        - SUBLIME_TEXT_VERSION="3"
+        - SUBLIME_TEXT_VERSION="3" PCINSTALL=true
 
 language:
     - python
@@ -25,12 +25,13 @@ before_install:
             sh -e /etc/init.d/xvfb start;
             sudo apt-get update -yqq;
             sudo apt-get install -y clang;
-            sudo pip install --upgrade pep8 pep257;
+            sudo pip install --upgrade pycodestyle pep257;
             sudo pip install coverage codacy-coverage;
       fi
 
 install:
     - sh travis.sh bootstrap
+    - if [ "$PCINSTALL" == true ]; then sh travis.sh install_package_control; fi
 
 script:
     - ls
