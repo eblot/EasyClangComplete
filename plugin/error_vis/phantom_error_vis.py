@@ -6,6 +6,7 @@ Attributes:
 import logging
 import sublime
 from os import path
+from re import compile as recompile
 from string import Template
 
 from ..tools import SublBridge
@@ -27,6 +28,8 @@ class PhantomErrorVis(PopupErrorVis):
     phantom_sets = {}
 
     HTML_TEMPLATE = Template(open(HTML_FILE_PATH, encoding='utf8').read())
+
+    ANSI_ESCAPE_CRE = recompile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 
     def show_phantoms(self, view):
         """Show phantoms for compilation errors.
@@ -100,6 +103,8 @@ class PhantomErrorVis(PopupErrorVis):
         first_error_processed = False
         for entry in errors_dict:
             processed_error = cgi.escape(entry['error'])
+            processed_error = \
+                PhantomErrorVis.ANSI_ESCAPE_CRE.sub('', processed_error)
             processed_error = processed_error.replace(' ', '&nbsp;')
             if first_error_processed:
                 processed_error = '<br>' + processed_error
