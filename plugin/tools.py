@@ -430,6 +430,8 @@ class Tools:
     """
 
     syntax_regex = re.compile("\/([^\/]+)\.(?:tmLanguage|sublime-syntax)")
+    ansi_regex = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+
 
     valid_extensions = [".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".hxx",
                         ".m", ".mm"]
@@ -678,9 +680,9 @@ class Tools:
                                              cwd=cwd,
                                              env=env,
                                              startupinfo=startupinfo)
-            output_text = ''.join(map(chr, output))
+            output_text = Tools.ansi_regex.sub('', ''.join(map(chr, output)))
         except subprocess.CalledProcessError as e:
-            output_text = e.output.decode("utf-8")
+            output_text = Tools.ansi_regex.sub('', e.output.decode("utf-8"))
             log.debug("command finished with code: %s", e.returncode)
             log.debug("command output: \n%s", output_text)
         except OSError:
